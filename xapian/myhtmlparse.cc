@@ -46,22 +46,23 @@ void MyHtmlParser::parse_html(const string& text,
 
 void MyHtmlParser::process_text(const string& text)
 {
-  if (!text.empty() && !in_script_tag && !in_style_tag) {
-    string::size_type b = text.find_first_not_of(WHITESPACE);
-    if (b)
-      pending_space = true;
-    while (b != string::npos) {
-      if (pending_space && !dump.empty())
-        dump += ' ';
-      string::size_type e = text.find_first_of(WHITESPACE, b);
-      pending_space = (e != string::npos);
-      if (!pending_space) {
-        dump.append(text.data() + b, text.size() - b);
-        return;
-      }
-      dump.append(text.data() + b, e - b);
-      b = text.find_first_not_of(WHITESPACE, e + 1);
+  if (text.empty() || in_script_tag || in_style_tag || in_reference_span) {
+    return;
+  }
+  string::size_type b = text.find_first_not_of(WHITESPACE);
+  if (b)
+    pending_space = true;
+  while (b != string::npos) {
+    if (pending_space && !dump.empty())
+      dump += ' ';
+    string::size_type e = text.find_first_of(WHITESPACE, b);
+    pending_space = (e != string::npos);
+    if (!pending_space) {
+      dump.append(text.data() + b, text.size() - b);
+      return;
     }
+    dump.append(text.data() + b, e - b);
+    b = text.find_first_not_of(WHITESPACE, e + 1);
   }
 }
 
@@ -226,9 +227,23 @@ void MyHtmlParser::opening_tag(const string& tag)
         in_script_tag = true;
         break;
       }
-      if (tag == "select")
+      if (tag == "select") {
         pending_space = true;
-      break;
+        break;
+      }
+      if (tag == "span") {
+        if (in_reference_span) {
+          in_reference_span += 1;
+        } else {
+          string klass;
+          if (get_parameter("class", klass)) {
+            if (klass.find("mw-reference-text") != string::npos) {
+              in_reference_span = 1;
+            }
+          }
+        }
+        break;
+      }
     case 't':
       if (tag == "table" || tag == "td" || tag == "textarea" || tag == "th")
         pending_space = true;
@@ -311,9 +326,16 @@ void MyHtmlParser::closing_tag(const string& tag)
         in_script_tag = false;
         break;
       }
-      if (tag == "select")
+      if (tag == "select") {
         pending_space = true;
+      }
       break;
+      if (tag == "span") {
+        if (in_reference_span) {
+          in_reference_span--;
+        }
+        break;
+      }
     case 't':
       if (tag == "title") {
         if (title.empty())

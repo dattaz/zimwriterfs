@@ -34,6 +34,7 @@ class MyHtmlParser : public HtmlParser
  public:
   bool in_script_tag;
   bool in_style_tag;
+  int in_reference_span;
   bool pending_space;
   bool indexing_allowed;
   bool charset_from_meta;
@@ -47,6 +48,7 @@ class MyHtmlParser : public HtmlParser
   MyHtmlParser()
       : in_script_tag(false),
         in_style_tag(false),
+        in_reference_span(0),
         pending_space(false),
         indexing_allowed(true),
         charset_from_meta(false)
@@ -57,6 +59,7 @@ class MyHtmlParser : public HtmlParser
   {
     in_script_tag = false;
     in_style_tag = false;
+    in_reference_span = 0;
     pending_space = false;
     indexing_allowed = true;
     charset_from_meta = false;
