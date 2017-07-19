@@ -26,6 +26,7 @@
 #include "tools.h"
 
 #include <unicode/locid.h>
+#include <unicode/numfmt.h>
 #include <xapian.h>
 #include <zim/blob.h>
 #include "xapian/myhtmlparse.h"
@@ -47,6 +48,18 @@ class XapianMetaArticle : public Article
     mimeType = "application/octet-stream+xapian";
   };
   virtual zim::Blob getData() const;
+};
+
+class CustomStopper : public Xapian::SimpleStopper
+{
+ public:
+  CustomStopper();
+  void init(const std::string& language, const icu::Locale& inLocale);
+  ~CustomStopper();
+  virtual bool operator()(const std::string& input) const;
+
+  std::string stopwords;
+  icu::NumberFormat* numberParsing;
 };
 
 class XapianIndexer : public Indexer, public IHandler
@@ -71,11 +84,10 @@ class XapianIndexer : public Indexer, public IHandler
 
   Xapian::WritableDatabase writableDatabase;
   Xapian::Stem stemmer;
-  Xapian::SimpleStopper stopper;
+  CustomStopper stopper;
   Xapian::TermGenerator indexer;
   std::string indexPath;
   std::string language;
-  std::string stopwords;
 };
 
 #endif  // OPENZIM_ZIMWRITERFS_XAPIANINDEXER_H

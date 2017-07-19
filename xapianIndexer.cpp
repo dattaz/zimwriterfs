@@ -20,6 +20,56 @@
 #include "xapianIndexer.h"
 #include "resourceTools.h"
 
+#include <unicode/fmtable.h>
+#include <unicode/utypes.h>
+
+CustomStopper::CustomStopper()
+{
+}
+
+void CustomStopper::init(const std::string& language, const icu::Locale& locale)
+{
+  UErrorCode error;
+
+  this->numberParsing = icu::NumberFormat::createInstance(locale, error);
+
+  if (error == U_MISSING_RESOURCE_ERROR) {
+    std::cerr
+        << "ICU resource data is missing. Impossible to create number parser."
+        << std::endl;
+    std::cerr << "Numbers will not be skipped from indexing." << std::endl;
+    std::cerr << "You may want to compile ICU with all resource data."
+              << std::endl;
+  }
+
+  std::string stopWord;
+  this->stopwords = getResourceAsString("stopwords/" + language);
+  std::istringstream file(this->stopwords);
+  while (std::getline(file, stopWord, '\n')) {
+    this->add(stopWord);
+  }
+}
+
+CustomStopper::~CustomStopper()
+{
+  if (this->numberParsing != nullptr)
+    delete this->numberParsing;
+}
+
+bool CustomStopper::operator()(const std::string& term) const
+{
+  if (this->numberParsing != nullptr) {
+    UErrorCode error;
+    icu::Formattable result;
+    icu::UnicodeString uni_term(term.c_str());
+    this->numberParsing->parse(uni_term, result, error);
+    if (U_SUCCESS(error)) {
+      return false;
+    }
+  }
+  return Xapian::SimpleStopper::operator()(term);
+}
+
 /* Constructor */
 XapianIndexer::XapianIndexer(const std::string& language, const bool verbose)
     : language(language)
@@ -40,14 +90,7 @@ XapianIndexer::XapianIndexer(const std::string& language, const bool verbose)
               << "'" << std::endl;
   }
 
-  /* Read the stopwords */
-  std::string stopWord;
-  this->stopwords = getResourceAsString("stopwords/" + language);
-  std::istringstream file(this->stopwords);
-  while (std::getline(file, stopWord, '\n')) {
-    this->stopper.add(stopWord);
-  }
-
+  this->stopper.init(language, languageLocale);
   this->indexer.set_stopper(&(this->stopper));
   this->indexer.set_stopper_strategy(Xapian::TermGenerator::STOP_ALL);
 }
@@ -71,7 +114,7 @@ void XapianIndexer::indexingPrelude(const string indexPath_)
       indexPath + ".tmp", Xapian::DB_CREATE_OR_OVERWRITE);
   this->writableDatabase.set_metadata("valuesmap", "title:0;wordcount:1");
   this->writableDatabase.set_metadata("language", language);
-  this->writableDatabase.set_metadata("stopwords", stopwords);
+  this->writableDatabase.set_metadata("stopwords", stopper.stopwords);
   this->writableDatabase.begin_transaction(true);
 }
 
