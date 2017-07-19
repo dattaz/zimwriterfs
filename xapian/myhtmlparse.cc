@@ -46,7 +46,8 @@ void MyHtmlParser::parse_html(const string& text,
 
 void MyHtmlParser::process_text(const string& text)
 {
-  if (text.empty() || in_script_tag || in_style_tag || in_reference_span) {
+  if (text.empty() || in_script_tag || in_style_tag || in_reference_span
+      || skip_span) {
     return;
   }
   string::size_type b = text.find_first_not_of(WHITESPACE);
@@ -239,6 +240,8 @@ void MyHtmlParser::opening_tag(const string& tag)
           if (get_parameter("class", klass)) {
             if (klass.find("mw-reference-text") != string::npos) {
               in_reference_span = 1;
+            } else if (klass.find("mw-linkback-text") != string::npos) {
+              skip_span = true;
             }
           }
         }
@@ -331,6 +334,7 @@ void MyHtmlParser::closing_tag(const string& tag)
       }
       break;
       if (tag == "span") {
+        skip_span = false;
         if (in_reference_span) {
           in_reference_span--;
         }
